@@ -1,0 +1,150 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>聊天室</title>
+    <link href="Contents/css/style.css" rel="stylesheet" />
+    <script src="Scripts/jquery-3.1.1.min.js"></script>
+    <script type="text/javascript">
+        $(function () {
+            $('.uname').hover(
+                function () {
+                    $('.managerbox').stop(true, true).slideDown(100);
+                },
+                function () {
+                    $('.managerbox').stop(true, true).slideUp(100);
+                }
+            );
+        })
+        var socket = null;
+        var uri = "ws://" + window.location.host;
+
+        var time = null;
+        var timedCount = function () {
+            if (socket.readyState === 1)
+                socket.send("heartbeat");
+            time = setTimeout(timedCount, 58 * 1000);
+        }
+
+        function Login() {
+            var uname = $("#userName").val();
+            if (!uname) {
+                alert("请输入昵称");
+                return;
+            }
+            if (socket==null||socket.readyState!=1) {
+                socket = new WebSocket(uri + "/chat.ashx?userName=" + uname);
+                timedCount();
+            }
+            $("#myName").html(uname);
+            socket.onopen = function (data) {
+                $("#loginbox").hide();
+                $("#chatbox").show();
+            }
+            socket.onerror = function (data) {
+                alert(data.data);
+            }
+            socket.onclose = function (data) {
+                $("#loginbox").show();
+                $("#chatbox").hide();
+                socket = null;
+            }
+            $.post("chat.ashx", { "get": "get" }, function (data) {
+                var json = JSON.parse(data);
+                for (var i = 0; i < json.length; i++) {
+                    if (json[i].name !="【***系统***】") {
+                        $("#message_box").append(json[i].name + "：" + json[i].info + "      时间" + json[i].date + "<br />");
+                    }
+                  
+                }
+            })
+            socket.onmessage = function (data) {
+                var json = JSON.parse(data.data);
+                if (json.name!=""&&json.name!=null) {
+                    $("#message_box").append(json.name + "说：");
+                }
+                if (json.info != "" && json.info != null) {
+                    $("#message_box").append(json.info + "   ");
+                }
+                if (json.date!=""&&json.date!=null) {
+                    $("#message_box").append("时间："+json.date);
+                }
+                $("#message_box").append("<br />");
+            }
+        }
+        function UserExit() {
+            alert("用户退出聊天");
+            $("#loginbox").show();
+            $("#chatbox").hide();
+            socket.close();
+        }
+        function Send() {
+            var msg = $("#message").val();
+            if (msg==null||msg=="") {
+                alert("请输入消息");
+                return;
+            }
+            if (socket==null) {
+                alert("请登录！")
+                return;
+            }
+            var chat = {
+                "info": msg,
+                "time": new Date(),
+                "name": $("#myName").html(),
+            };
+            socket.send(JSON.stringify(chat));
+            socket.onmessage = function (data) {
+                var json = JSON.parse(data.data);
+                $("#message_box").append(json.name +"说："+json.info+"时间："+json.date+ "<br />");
+            }
+            $("#message").val("说点什么");
+        }
+    </script>
+    <style>
+        .loginbox {
+            margin:0 auto;
+            width:400px;
+            height:300px;
+            border:3px solid #000000
+        }
+    </style>
+</head>
+<body>
+    <div class="loginbox" id="loginbox">
+        <div style="margin-top:50px">
+            <span>请输入昵称</span><input type="text" value="" placeholder="" id="userName" /><input type="button" onclick="Login()" value="登陆" />
+            </div>
+    </div>
+    <div class="chatbox" id="chatbox" style="display:none">
+        <div class="chat_top fn-clear">
+            <div class="logo"><img src="Contents/images/logo.png" width="190" height="60" alt="" /></div>
+            <div class="uinfo fn-clear">
+                <div class="uface"><img src="Contents/images/hetu.jpg" width="40" height="40" alt="" /></div>
+                <div class="uname"><span id="myName"></span>
+                    <i class="fontico down"></i>
+                    <ul class="managerbox">
+                        <li><a href="#" onclick="UserExit()"><i class="fontico logout"></i>退出登录</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="chat_message fn-clear">
+            <div class="chat_left">
+                <div class="message_box" id="message_box">
+                </div>
+                <div class="write_box">
+                    <textarea id="message" name="message" class="write_area" placeholder="说点啥吧..."></textarea>
+                    <input type="hidden" name="fromname" id="fromname" value="河图" />
+                    <input type="hidden" name="to_uid" id="to_uid" value="0">
+                    <div class="facebox fn-clear">
+                        <div class="expression"></div>
+                        <div class="chat_type" id="chat_type">群聊</div>
+                        <button name="" class="sub_but" onclick="Send()">提 交</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
